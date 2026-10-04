@@ -41,6 +41,7 @@ export const UI_TRANSLATION_KEYS = [
   "Галерея",
   "Открыто до",
   "Закрыто до",
+  "Закрыто",
   "Создано в",
   "Открыть свободное время",
   "Запишитесь онлайн",
@@ -82,6 +83,79 @@ export function hasUsableLink(value) {
   if (typeof value !== "string") return false;
   const normalized = value.trim();
   return Boolean(normalized) && !invalidLinks.has(normalized);
+}
+
+const WEEKDAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const WEEKDAY_FROM_INTL = {
+  Sun: "sun",
+  Mon: "mon",
+  Tue: "tue",
+  Wed: "wed",
+  Thu: "thu",
+  Fri: "fri",
+  Sat: "sat",
+};
+
+function clockToMinutes(value) {
+  const match = String(value || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return null;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+export function openingStatusAt(site, now = new Date()) {
+  const location = site?.location || {};
+  const timeZone = String(location.timeZone || "UTC");
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const weekday = WEEKDAY_FROM_INTL[parts.find((part) => part.type === "weekday")?.value] || "";
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+  const minuteOfDay = hour * 60 + minute;
+
+  const weekly = location.weeklyHours;
+  const hasWeekly = weekly && typeof weekly === "object" && !Array.isArray(weekly)
+    && WEEKDAY_KEYS.some((key) => Object.prototype.hasOwnProperty.call(weekly, key));
+
+  if (hasWeekly) {
+    const slot = weekly[weekday];
+    if (!slot) {
+      return { isOpen: false, boundaryTime: "", phase: "closed", day: weekday };
+    }
+    const openTime = String(slot.open || "").trim();
+    const closeTime = String(slot.close || "").trim();
+    const open = clockToMinutes(openTime);
+    const close = clockToMinutes(closeTime);
+    if (open === null || close === null || close <= open) {
+      return { isOpen: null, boundaryTime: "", phase: "invalid", day: weekday };
+    }
+    if (minuteOfDay >= open && minuteOfDay < close) {
+      return { isOpen: true, boundaryTime: closeTime, phase: "open", day: weekday };
+    }
+    if (minuteOfDay < open) {
+      return { isOpen: false, boundaryTime: openTime, phase: "before", day: weekday };
+    }
+    return { isOpen: false, boundaryTime: "", phase: "after", day: weekday };
+  }
+
+  const openTime = String(location.openTime || "").trim();
+  const closeTime = String(location.closeTime || "").trim();
+  const open = clockToMinutes(openTime);
+  const close = clockToMinutes(closeTime);
+  if (open === null || close === null || close <= open) {
+    return { isOpen: null, boundaryTime: "", phase: "invalid", day: weekday };
+  }
+  if (minuteOfDay >= open && minuteOfDay < close) {
+    return { isOpen: true, boundaryTime: closeTime, phase: "open", day: weekday };
+  }
+  if (minuteOfDay < open) {
+    return { isOpen: false, boundaryTime: openTime, phase: "before", day: weekday };
+  }
+  return { isOpen: false, boundaryTime: "", phase: "after", day: weekday };
 }
 
 export function visibleServiceGroups(site) {
