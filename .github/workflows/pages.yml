@@ -1,0 +1,69 @@
+name: Quality and Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Checkout approved Hair decoration source
+        uses: actions/checkout@v5
+        with:
+          repository: ichAEY/Shablon-Hair-Master
+          ref: d9ce7e2cd6fa16ad900fce2568b584cbc5a84481
+          path: .tanem-source-hair
+      - name: Prepare approved template assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/assets/template
+          cp .tanem-source-hair/public/assets/yulia/tools/hero.png public/assets/template/hair-tools.png
+          rm -rf .tanem-source-hair
+          test -s public/assets/template/hair-tools.png
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - name: Render production scenarios
+        run: npm run qa:scenarios
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          token: ${{ secrets.TANEM_PAGES_TOKEN || github.token }}
+          enablement: ${{ secrets.TANEM_PAGES_TOKEN != '' && 'true' || 'false' }}
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: out
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
