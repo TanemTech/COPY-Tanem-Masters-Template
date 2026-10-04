@@ -49,6 +49,10 @@ export default {
     timeZone: "UTC",
     openTime: "00:00",
     closeTime: "00:00",
+    // Optional weekly source of truth for the live Open / Closed badge.
+    // Use all seven keys on production sites; null means the master is closed that day.
+    // Example: mon: { open: "10:00", close: "16:00" }.
+    weeklyHours: {},
   },
 
   contacts: {

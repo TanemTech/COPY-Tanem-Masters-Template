@@ -145,6 +145,7 @@ Layout:
 - Desktop booking/contact remains unchanged unless separately approved.
 - The primary mobile booking CTA spans the full available action width.
 - The live `Открыто / Закрыто` badge is shown at the right of `Запись и связь` and recalculates from the client's configured timezone and schedule data.
+- When working hours differ by weekday, `location.weeklyHours` is the source of truth: define all seven keys `mon`…`sun`; a working day is `{ open: "HH:MM", close: "HH:MM" }`, and a day off is `null`. Never flatten a weekly schedule into one generic open/close pair. Legacy `openTime/closeTime` remains supported only when no weekly schedule is configured.
 - A verified address and work schedule are displayed below the mobile contact actions as plain-text styling, never as a white card or separate route button.
 - The displayed mobile address itself is clickable and opens the same verified route/map URL. If the source is Yandex Maps, keep the Yandex link; if the source is Google Maps, keep the Google link. Never substitute the provider or invent a route URL.
 - The mobile location action uses that same verified route/map URL.

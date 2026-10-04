@@ -8,6 +8,7 @@ import {
   experienceMode,
   masterImageSources,
   masterNameForLocale,
+  openingStatusAt,
   serviceBookingUrl,
   specialtyMode,
 } from "../template-rules.mjs";
@@ -20,6 +21,7 @@ const makeSite = (overrides = {}) => ({
   services: { groups: [], ...overrides.services },
   i18n: { locales: [{ code: "ru", label: "RU" }, { code: "en", label: "EN" }], ...overrides.i18n },
   images: { logo: "", hero: "", profile: "", gallery: [], ...overrides.images },
+  location: { timeZone: "UTC", openTime: "10:00", closeTime: "20:00", weeklyHours: {}, ...overrides.location },
   basePath: overrides.basePath || "",
 });
 
@@ -92,4 +94,54 @@ test("master images prefer real canonical files and otherwise use specialty fall
     hero: "/hero.webp",
     profile: "/profile.webp",
   });
+});
+
+
+test("weekly hours drive the live badge by weekday and respect closed days", () => {
+  const site = makeSite({
+    location: {
+      timeZone: "Europe/Moscow",
+      weeklyHours: {
+        mon: { open: "10:00", close: "16:00" },
+        tue: { open: "10:00", close: "20:00" },
+        wed: { open: "10:00", close: "20:00" },
+        thu: { open: "10:00", close: "20:00" },
+        fri: { open: "10:00", close: "16:00" },
+        sat: { open: "09:00", close: "20:00" },
+        sun: null,
+      },
+    },
+  });
+
+  assert.deepEqual(openingStatusAt(site, new Date("2026-10-05T12:00:00Z")), {
+    isOpen: true,
+    boundaryTime: "16:00",
+    phase: "open",
+    day: "mon",
+  });
+  assert.deepEqual(openingStatusAt(site, new Date("2026-10-06T05:30:00Z")), {
+    isOpen: false,
+    boundaryTime: "10:00",
+    phase: "before",
+    day: "tue",
+  });
+  assert.deepEqual(openingStatusAt(site, new Date("2026-10-11T09:00:00Z")), {
+    isOpen: false,
+    boundaryTime: "",
+    phase: "closed",
+    day: "sun",
+  });
+});
+
+test("legacy openTime/closeTime remains supported when weeklyHours is absent", () => {
+  const site = makeSite({
+    location: {
+      timeZone: "UTC",
+      openTime: "10:00",
+      closeTime: "18:00",
+      weeklyHours: {},
+    },
+  });
+  assert.equal(openingStatusAt(site, new Date("2026-10-05T12:00:00Z")).isOpen, true);
+  assert.equal(openingStatusAt(site, new Date("2026-10-05T08:00:00Z")).boundaryTime, "10:00");
 });

@@ -305,3 +305,10 @@ test("Julia booking structure replaces only the mobile block", () => {
   assert.match(mobileDetails, /site\.location\.schedule/);
   assert.doesNotMatch(mobileDetails, /mct-mobile-route-card|mct-map-wrap/);
 });
+
+
+test("live open status is driven by the weekday-aware schedule helper", () => {
+  assert.match(component, /openingStatusAt\(site, new Date\(\)\)/);
+  assert.match(component, /openStatus\.boundaryTime/);
+  assert.doesNotMatch(component, /minuteOfDay >= openMinutes/);
+});

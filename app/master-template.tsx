@@ -16,6 +16,7 @@ import {
   masterInitial,
   masterNameForLocale,
   normalizedLocales,
+  openingStatusAt,
   SERVICE_PREVIEW_LIMIT,
   serviceBookingUrl,
   specialtyMode,
@@ -83,13 +84,6 @@ const amenities: Amenity[] = [
   { title: "Перенос записи", text: "Предупредите заранее." },
 ];
 
-const toMinutes = (value: string) => {
-  const [hours, minutes] = value.split(":").map(Number);
-  return hours * 60 + minutes;
-};
-const openMinutes = toMinutes(site.location.openTime);
-const closeMinutes = toMinutes(site.location.closeTime);
-
 const paletteSamples = [
   { base: "#625873", light: "#948aa3", dark: "#3d354a" },
   { base: "#7b6b94", light: "#aa9fbb", dark: "#514562" },
@@ -124,8 +118,14 @@ export default function MasterTemplate() {
   const [lightboxTransform, setLightboxTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [reviewsPaused, setReviewsPaused] = useState(false);
   const [desktopGalleryPaused, setDesktopGalleryPaused] = useState(false);
-  const [openStatus, setOpenStatus] = useState<{ isOpen: boolean | null }>({
+  const [openStatus, setOpenStatus] = useState<{
+    isOpen: boolean | null;
+    boundaryTime: string;
+    phase: string;
+  }>({
     isOpen: null,
+    boundaryTime: "",
+    phase: "unknown",
   });
   const heroRef = useRef<HTMLElement>(null);
   const finalBookRef = useRef<HTMLElement>(null);
@@ -230,6 +230,7 @@ export default function MasterTemplate() {
     "Галерея": "Gallery",
     "Открыто до": "Open until",
     "Закрыто до": "Closed until",
+    "Закрыто": "Closed",
     "Создано в": "Created with",
     "Открыть свободное время": "Open available times",
     "Все отзывы": "All reviews",
@@ -276,6 +277,13 @@ export default function MasterTemplate() {
     if (locale === "en" && baseEnglish[value]) return baseEnglish[value];
     return value;
   };
+  const openStatusText = openStatus.isOpen === true
+    ? `${translatedText("Открыто до")} ${openStatus.boundaryTime}`
+    : openStatus.isOpen === false
+      ? openStatus.boundaryTime
+        ? `${translatedText("Закрыто до")} ${openStatus.boundaryTime}`
+        : translatedText("Закрыто")
+      : translatedText(site.location.scheduleCapitalized);
   const localizedMasterName = masterNameForLocale(site, locale) || "TANEM";
   const localizedBrandName = site.brand.name || localizedMasterName || "TANEM";
   const translatedCountText = (key: string, count: number) => {
@@ -410,19 +418,15 @@ export default function MasterTemplate() {
   }, []);
 
   useEffect(() => {
-    if (!site.location.scheduleCapitalized || !site.location.openTime || !site.location.closeTime) return;
+    if (!site.location.scheduleCapitalized) return;
 
     const updateStatus = () => {
-      const parts = new Intl.DateTimeFormat("ru-RU", {
-        timeZone: site.location.timeZone,
-        hour: "2-digit",
-        minute: "2-digit",
-        hourCycle: "h23",
-      }).formatToParts(new Date());
-      const hours = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
-      const minutes = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
-      const minuteOfDay = hours * 60 + minutes;
-      setOpenStatus({ isOpen: minuteOfDay >= openMinutes && minuteOfDay < closeMinutes });
+      const status = openingStatusAt(site, new Date());
+      setOpenStatus({
+        isOpen: status.isOpen,
+        boundaryTime: status.boundaryTime,
+        phase: status.phase,
+      });
     };
 
     const frame = window.requestAnimationFrame(updateStatus);
@@ -1615,11 +1619,7 @@ export default function MasterTemplate() {
               {site.location.scheduleCapitalized ? (
                 <span className={`mct-open-status${openStatus.isOpen === true ? " is-open" : openStatus.isOpen === false ? " is-closed" : ""}`}>
                   <i aria-hidden="true" />
-                  {openStatus.isOpen === true
-                    ? `${translatedText("Открыто до")} ${site.location.closeTime}`
-                    : openStatus.isOpen === false
-                      ? `${translatedText("Закрыто до")} ${site.location.openTime}`
-                      : translatedText(site.location.scheduleCapitalized)}
+                  {openStatusText}
                 </span>
               ) : null}
             </div>
@@ -1664,11 +1664,7 @@ export default function MasterTemplate() {
               {site.location.scheduleCapitalized ? (
                 <span className={`mct-open-status${openStatus.isOpen === true ? " is-open" : openStatus.isOpen === false ? " is-closed" : ""}`}>
                   <i aria-hidden="true" />
-                  {openStatus.isOpen === true
-                    ? `${translatedText("Открыто до")} ${site.location.closeTime}`
-                    : openStatus.isOpen === false
-                      ? `${translatedText("Закрыто до")} ${site.location.openTime}`
-                      : translatedText(site.location.scheduleCapitalized)}
+                  {openStatusText}
                 </span>
               ) : null}
             </div>
