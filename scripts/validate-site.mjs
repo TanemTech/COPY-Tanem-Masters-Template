@@ -55,6 +55,41 @@ for (const group of groups) {
 }
 
 if (!site.location.timeZone) fail("location.timeZone must exist");
+
+const weekdayKeys = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const weeklyHours = site.location.weeklyHours;
+if (weeklyHours !== undefined && (weeklyHours === null || typeof weeklyHours !== "object" || Array.isArray(weeklyHours))) {
+  fail("location.weeklyHours must be an object");
+}
+if (weeklyHours && typeof weeklyHours === "object" && !Array.isArray(weeklyHours)) {
+  const configuredKeys = weekdayKeys.filter((key) => Object.prototype.hasOwnProperty.call(weeklyHours, key));
+  const unknownKeys = Object.keys(weeklyHours).filter((key) => !weekdayKeys.includes(key));
+  if (unknownKeys.length) fail(`location.weeklyHours has unsupported day keys: ${unknownKeys.join(", ")}`);
+  if (site.master.name && configuredKeys.length > 0 && configuredKeys.length !== 7) {
+    fail("published weekly schedule must define all seven days; use null for a closed day");
+  }
+  const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  const minutes = (value) => {
+    const [, hours, mins] = String(value).match(timePattern) || [];
+    return hours === undefined ? null : Number(hours) * 60 + Number(mins);
+  };
+  for (const key of configuredKeys) {
+    const slot = weeklyHours[key];
+    if (slot === null) continue;
+    if (!slot || typeof slot !== "object" || Array.isArray(slot)) {
+      fail(`location.weeklyHours.${key} must be null or { open, close }`);
+    }
+    const open = String(slot.open || "").trim();
+    const close = String(slot.close || "").trim();
+    if (!timePattern.test(open) || !timePattern.test(close)) {
+      fail(`location.weeklyHours.${key} must use HH:MM open/close values`);
+    }
+    if (minutes(close) <= minutes(open)) {
+      fail(`location.weeklyHours.${key} close must be later than open`);
+    }
+  }
+}
+
 if (!site.seo.siteUrl) fail("seo.siteUrl must exist");
 if (!["generic", "hair", "nails"].includes(specialtyMode(site))) fail("unsupported specialty");
 
