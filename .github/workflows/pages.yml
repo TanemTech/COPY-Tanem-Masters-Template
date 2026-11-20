@@ -55,7 +55,7 @@ jobs:
         run: |
           node --input-type=module -e '
             import site from "./site-data.mjs";
-            console.log("publish=" + Boolean(String(site.master.name).trim()));
+            console.log("publish=" + Boolean(String(site.master.name ?? "").trim()));
           ' >> "$GITHUB_OUTPUT"
       - name: Configure GitHub Pages
         if: steps.site_mode.outputs.publish == 'true'
