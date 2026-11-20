@@ -19,6 +19,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.site_mode.outputs.publish }}
     env:
       NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
     steps:
@@ -46,18 +48,29 @@ jobs:
       - run: npm test
       - name: Render production scenarios
         run: npm run qa:scenarios
+      - name: Check whether a client site is ready for Pages
+        id: site_mode
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          node --input-type=module -e '
+            import site from "./site-data.mjs";
+            console.log("publish=" + Boolean(String(site.master.name).trim()));
+          ' >> "$GITHUB_OUTPUT"
       - name: Configure GitHub Pages
+        if: steps.site_mode.outputs.publish == 'true'
         uses: actions/configure-pages@v5
         with:
           token: ${{ secrets.TANEM_PAGES_TOKEN || github.token }}
           enablement: ${{ secrets.TANEM_PAGES_TOKEN != '' && 'true' || 'false' }}
       - name: Upload Pages artifact
+        if: steps.site_mode.outputs.publish == 'true'
         uses: actions/upload-pages-artifact@v4
         with:
           path: out
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: needs.build.outputs.publish == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
